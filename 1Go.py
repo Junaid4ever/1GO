@@ -2,9 +2,9 @@ import threading
 import asyncio
 import sys
 import base64
-import random  # <-- IMPORTANT: random import add kiya
+import random
 from datetime import datetime
-import indian_names  # <-- FAKER HATAYA, INDIAN-NAMES LAGAYA
+import indian_names
 from playwright.async_api import async_playwright
 import nest_asyncio
 
@@ -141,10 +141,14 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
             return
 
         # ============================================
-        # PASSCODE INPUT - OPTIONAL (AGAR DIYA HO TO)
+        # PASSCODE INPUT - SIRF TAB SKIP KARO JAB PASSCODE EMPTY HO
         # ============================================
         passcode_entered = False
-        if passcode and passcode != "0" and passcode != "":
+        
+        # � FIXED LOGIC: Sirf tab skip karo jab passcode EMPTY ("") ho
+        # Agar passcode "0" hai to bhi enter karo (0 bhi valid passcode ho sakta hai)
+        if passcode is not None and passcode != "":  # <-- YEH CHANGE KIYA
+            sync_print(f"{tag} attempting to enter passcode: {passcode}")
             try:
                 # Try multiple selectors for passcode input
                 passcode_selectors = [
@@ -169,15 +173,15 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
                 if pass_input:
                     await asyncio.sleep(1.5)
                     await pass_input.fill(passcode)
-                    sync_print(f"{tag} passcode filled")
+                    sync_print(f"{tag} passcode filled: {passcode}")
                     passcode_entered = True
                 else:
                     sync_print(f"{tag} no passcode field found - meeting might not require passcode")
                     
             except Exception as e:
-                sync_print(f"{tag} passcode fill skipped (not required): {e}")
+                sync_print(f"{tag} passcode fill error: {e}")
         else:
-            sync_print(f"{tag} passcode not provided, skipping passcode field")
+            sync_print(f"{tag} no passcode provided (empty), skipping passcode field")
 
         # Wait for all bots to be ready
         await wait_for_all_bots()
