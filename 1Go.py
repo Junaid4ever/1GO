@@ -2,13 +2,20 @@ import threading
 import asyncio
 import sys
 import base64
+import random  # <-- IMPORTANT: random import add kiya
 from datetime import datetime
-from faker import Faker
+import indian_names  # <-- FAKER HATAYA, INDIAN-NAMES LAGAYA
 from playwright.async_api import async_playwright
 import nest_asyncio
 
 nest_asyncio.apply()
-fake = Faker('en_IN')
+
+# INDIAN NAMES USE KARO
+def get_indian_name():
+    """Generate random Indian name"""
+    gender = random.choice(['male', 'female'])
+    return indian_names.get_full_name(gender=gender)
+
 MUTEX = threading.Lock()
 
 def sync_print(msg):
@@ -114,13 +121,18 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
         await page.goto(zoom_url, timeout=120000)
         await page.wait_for_timeout(4000)
 
-        # NAME INPUT
+        # ============================================
+        # NAME INPUT - INDIAN NAME GENERATE KARO
+        # ============================================
         try:
             name_input = page.locator('xpath=//*[@id="input-for-name"]')
             await name_input.wait_for(state="visible", timeout=30000)
             await asyncio.sleep(1)
-            await name_input.fill(fake.name())
-            sync_print(f"{tag} name filled")
+            
+            # Indian name generate karo
+            user_name = get_indian_name()
+            await name_input.fill(user_name)
+            sync_print(f"{tag} name filled: {user_name}")
         except Exception as e:
             sync_print(f"{tag} name fill failed: {e}")
             async with BOTS_LOCK:
@@ -128,34 +140,79 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
             await browser.close()
             return
 
-        # PASSCODE INPUT
-        try:
-            pass_input = page.locator(
-                'xpath=/html/body/div[2]/div[2]/div/div[1]/div/div[2]/div[2]/div/input'
-            )
-            await pass_input.wait_for(state="visible", timeout=30000)
-            await asyncio.sleep(1.5)
-            await pass_input.fill(passcode)
-            sync_print(f"{tag} passcode filled")
-        except Exception as e:
-            sync_print(f"{tag} passcode fill failed: {e}")
-            async with BOTS_LOCK:
-                BOTS_FAILED += 1
-            await browser.close()
-            return
+        # ============================================
+        # PASSCODE INPUT - OPTIONAL (AGAR DIYA HO TO)
+        # ============================================
+        passcode_entered = False
+        if passcode and passcode != "0" and passcode != "":
+            try:
+                # Try multiple selectors for passcode input
+                passcode_selectors = [
+                    'xpath=//input[@type="password"]',
+                    'xpath=//input[contains(@placeholder, "code")]',
+                    'xpath=//input[contains(@aria-label, "code")]',
+                    'xpath=//*[@id="input-for-password"]',
+                    'xpath=/html/body/div[2]/div[2]/div/div[1]/div/div[2]/div[2]/div/input'
+                ]
+                
+                pass_input = None
+                for selector in passcode_selectors:
+                    try:
+                        pass_input = page.locator(selector)
+                        if await pass_input.count() > 0:
+                            await pass_input.first.wait_for(state="visible", timeout=5000)
+                            pass_input = pass_input.first
+                            break
+                    except:
+                        continue
+                
+                if pass_input:
+                    await asyncio.sleep(1.5)
+                    await pass_input.fill(passcode)
+                    sync_print(f"{tag} passcode filled")
+                    passcode_entered = True
+                else:
+                    sync_print(f"{tag} no passcode field found - meeting might not require passcode")
+                    
+            except Exception as e:
+                sync_print(f"{tag} passcode fill skipped (not required): {e}")
+        else:
+            sync_print(f"{tag} passcode not provided, skipping passcode field")
 
         # Wait for all bots to be ready
         await wait_for_all_bots()
 
-        # 🔥 ALL BOTS JOIN TOGETHER NOW
+        # ============================================
+        # JOIN BUTTON CLICK
+        # ============================================
         try:
-            join_btn = page.locator(
+            # Try multiple join button selectors
+            join_selectors = [
+                'xpath=//button[contains(text(), "Join")]',
+                'xpath=//button[contains(@class, "join")]',
                 'xpath=//*[@id="root"]/div/div[1]/div/div[2]/button'
-            )
-            await join_btn.wait_for(state="visible", timeout=30000)
-            await asyncio.sleep(random.uniform(0.5, 1.5))  # Small random delay
-            await join_btn.click()
-            sync_print(f"{tag} join clicked")
+            ]
+            
+            join_btn = None
+            for selector in join_selectors:
+                try:
+                    join_btn = page.locator(selector)
+                    if await join_btn.count() > 0:
+                        await join_btn.first.wait_for(state="visible", timeout=5000)
+                        join_btn = join_btn.first
+                        break
+                except:
+                    continue
+            
+            if join_btn:
+                await asyncio.sleep(random.uniform(0.5, 1.5))  # Small random delay
+                await join_btn.click()
+                sync_print(f"{tag} join clicked")
+            else:
+                sync_print(f"{tag} join button not found")
+                await browser.close()
+                return
+                
         except Exception as e:
             sync_print(f"{tag} join click failed: {e}")
             await browser.close()
@@ -164,7 +221,7 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
         # Wait for meeting to load
         await asyncio.sleep(5)
 
-        # 🔥 JOIN AUDIO BY COMPUTER
+        # JOIN AUDIO BY COMPUTER
         await join_audio_computer(page, tag)
 
         # STAY IN MEETING
