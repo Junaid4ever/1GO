@@ -91,6 +91,109 @@ async def join_audio_computer(page, tag):
 
     return False
 
+async def wait_for_meeting_to_start(page, tag):
+    """
+    Yeh function tab tak wait karega jab tak meeting start nahi ho jaati
+    Xpath: //*[@id="root"]/div/div[2]/div[1]/div[3]/span
+    """
+    waiting_xpath = 'xpath=//*[@id="root"]/div/div[2]/div[1]/div[3]/span'
+    
+    sync_print(f"{tag} checking if meeting is live...")
+    
+    try:
+        # Pehle check karo ki kya yeh element exist karta hai
+        waiting_element = page.locator(waiting_xpath)
+        
+        # Agar element exist karta hai, matlab meeting live nahi hai
+        if await waiting_element.count() > 0 and await waiting_element.is_visible():
+            sync_print(f"{tag} meeting is NOT live! Waiting for host to start...")
+            
+            # Tab tak wait karo jab tak yeh element disappear na ho jaye
+            # Ya phir koi doosra element na aa jaye jo meeting start hone ka sign ho
+            while True:
+                try:
+                    # Check if waiting message still visible
+                    if await waiting_element.count() == 0 or not await waiting_element.is_visible():
+                        sync_print(f"{tag} meeting has started! Proceeding...")
+                        break
+                    
+                    # Kuch doosre elements check karo jo meeting start hone ke baad aate hain
+                    # Jaise mute button, participants list, etc.
+                    meeting_started_indicators = [
+                        'xpath=//button[contains(@aria-label, "mute")]',
+                        'xpath=//button[contains(text(), "Participants")]',
+                        'xpath=//button[contains(@aria-label, "Leave")]'
+                    ]
+                    
+                    for indicator in meeting_started_indicators:
+                        if await page.locator(indicator).count() > 0:
+                            sync_print(f"{tag} meeting started (detected by indicator)!")
+                            return True
+                    
+                    # Wait for 2 seconds before checking again
+                    await asyncio.sleep(2)
+                    
+                except Exception as e:
+                    await asyncio.sleep(2)
+                    continue
+        else:
+            sync_print(f"{tag} meeting is live! No waiting required.")
+            
+    except Exception as e:
+        sync_print(f"{tag} error while checking meeting status: {e}")
+    
+    return True
+
+async def wait_for_waiting_room(page, tag):
+    """
+    Yeh function waiting room ke liye wait karega
+    Xpath: /html/body/div[2]/div[2]/div/div/div/div[1]/div[2]/div[1]/div[3]/span
+    Jab host admit karega, tab yeh element disappear ho jayega
+    """
+    waiting_room_xpath = 'xpath=/html/body/div[2]/div[2]/div/div/div/div[1]/div[2]/div[1]/div[3]/span'
+    
+    sync_print(f"{tag} checking for waiting room...")
+    
+    try:
+        waiting_room_element = page.locator(waiting_room_xpath)
+        
+        # Check if waiting room is active
+        if await waiting_room_element.count() > 0 and await waiting_room_element.is_visible():
+            sync_print(f"{tag} IN WAITING ROOM! Waiting for host to admit...")
+            
+            # Tab tak wait karo jab tak waiting room se bahar na aa jaye
+            while True:
+                try:
+                    # Check if still in waiting room
+                    if await waiting_room_element.count() == 0 or not await waiting_room_element.is_visible():
+                        sync_print(f"{tag} admitted to meeting! Proceeding...")
+                        break
+                    
+                    # Extra indicators check for being admitted
+                    meeting_indicators = [
+                        'xpath=//button[contains(@aria-label, "mute")]',
+                        'xpath=//button[contains(text(), "Participants")]',
+                        'xpath=//button[contains(@aria-label, "Leave")]'
+                    ]
+                    
+                    for indicator in meeting_indicators:
+                        if await page.locator(indicator).count() > 0:
+                            sync_print(f"{tag} admitted to meeting (detected by indicator)!")
+                            return True
+                    
+                    await asyncio.sleep(2)
+                    
+                except Exception as e:
+                    await asyncio.sleep(2)
+                    continue
+        else:
+            sync_print(f"{tag} no waiting room detected")
+            
+    except Exception as e:
+        sync_print(f"{tag} error while checking waiting room: {e}")
+    
+    return True
+
 async def start(tag, wait_time, meetingcode, passcode, headless):
     global BOTS_FAILED
     sync_print(f"{tag} started")
@@ -145,9 +248,7 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
         # ============================================
         passcode_entered = False
         
-        # � FIXED LOGIC: Sirf tab skip karo jab passcode EMPTY ("") ho
-        # Agar passcode "0" hai to bhi enter karo (0 bhi valid passcode ho sakta hai)
-        if passcode is not None and passcode != "":  # <-- YEH CHANGE KIYA
+        if passcode is not None and passcode != "":
             sync_print(f"{tag} attempting to enter passcode: {passcode}")
             try:
                 # Try multiple selectors for passcode input
@@ -222,10 +323,19 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
             await browser.close()
             return
 
-        # Wait for meeting to load
-        await asyncio.sleep(5)
+        # ============================================
+        # NEW: WAIT FOR MEETING TO START (AGAR LIVE NAHI HAI TO)
+        # ============================================
+        await wait_for_meeting_to_start(page, tag)
+        
+        # ============================================
+        # NEW: WAIT FOR WAITING ROOM (AGAR ENABLED HAI TO)
+        # ============================================
+        await wait_for_waiting_room(page, tag)
 
-        # JOIN AUDIO BY COMPUTER
+        # ============================================
+        # FINALLY: JOIN AUDIO BY COMPUTER (JAB MEETING MEIN AA JAYE)
+        # ============================================
         await join_audio_computer(page, tag)
 
         # STAY IN MEETING
