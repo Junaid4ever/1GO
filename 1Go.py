@@ -1,5 +1,5 @@
 # ============================================
-# CELL 2: ZOOM BOT FUNCTIONS
+# CELL 1: ZOOM BOT FUNCTIONS
 # ============================================
 
 import threading
@@ -7,20 +7,34 @@ import asyncio
 import sys
 import base64
 import random
+import argparse
 from datetime import datetime
-import indian_names
 from playwright.async_api import async_playwright
 import nest_asyncio
 
 nest_asyncio.apply()
 
 # ============================================
-# INDIAN NAME GENERATOR
+# INDIAN NAME GENERATOR (Without external lib)
 # ============================================
+INDIAN_FIRST_NAMES = [
+    'Aarav', 'Vivaan', 'Aditya', 'Vihaan', 'Arjun', 'Reyansh', 'Ayaan', 'Krishna', 'Ishaan', 'Shaurya',
+    'Rahul', 'Rohan', 'Priya', 'Ananya', 'Diya', 'Saanvi', 'Aadhya', 'Kavya', 'Riya', 'Anika',
+    'Amit', 'Rajesh', 'Sneha', 'Pooja', 'Neha', 'Vikram', 'Karan', 'Manish', 'Suresh', 'Deepak',
+    'Sanjay', 'Raj', 'Simran', 'Meera', 'Aisha', 'Kabir', 'Arnav', 'Ishita', 'Naina', 'Rishi'
+]
+
+INDIAN_LAST_NAMES = [
+    'Sharma', 'Verma', 'Patel', 'Kumar', 'Singh', 'Reddy', 'Gupta', 'Joshi',
+    'Malhotra', 'Mehta', 'Chopra', 'Khanna', 'Agarwal', 'Jain', 'Saxena',
+    'Bansal', 'Srivastava', 'Mishra', 'Pandey', 'Rao', 'Desai', 'Nair'
+]
+
 def get_indian_name():
     """Generate random Indian name"""
-    gender = random.choice(['male', 'female'])
-    return indian_names.get_full_name(gender=gender)
+    first = random.choice(INDIAN_FIRST_NAMES)
+    last = random.choice(INDIAN_LAST_NAMES)
+    return f"{first} {last}"
 
 MUTEX = threading.Lock()
 
@@ -199,9 +213,10 @@ async def wait_for_waiting_room(page, tag):
     return True
 
 # ============================================
-# MAIN BOT FUNCTION
+# START BOT - MAIN FUNCTION
 # ============================================
-async def start_bot(tag, wait_time, meetingcode, passcode, headless):
+async def start(tag, wait_time, meetingcode, passcode, headless):
+    """Start a single Zoom bot"""
     global BOTS_FAILED
     sync_print(f"{tag} started")
 
@@ -274,7 +289,7 @@ async def start_bot(tag, wait_time, meetingcode, passcode, headless):
         # ============================================
         # PASSCODE INPUT
         # ============================================
-        if passcode and passcode != "":
+        if passcode and passcode != "" and passcode != "0":
             sync_print(f"{tag} entering passcode...")
             try:
                 passcode_selectors = [
@@ -377,42 +392,34 @@ async def start_bot(tag, wait_time, meetingcode, passcode, headless):
 
 
 # ============================================
-# MAIN FUNCTION - CELL 2 SE CALL HOGA
+# RUN INSTANCES - MAIN FUNCTION
 # ============================================
-def main(meeting_id, passcode, num_bots, duration_minutes, headless=True):
-    """
-    Main function to launch Zoom bots
-    
-    Parameters:
-    - meeting_id: Zoom meeting ID (e.g., "5415403058")
-    - passcode: Zoom meeting passcode (e.g., "850893")
-    - num_bots: Number of bots to launch (e.g., 10)
-    - duration_minutes: Duration in minutes (e.g., 5)
-    - headless: True=background, False=show browsers
-    """
+def run_instances(users, meeting_code, passcode, duration, visible_mode):
+    """Main function to launch multiple Zoom bots"""
     
     global BOTS_TOTAL
     
-    duration_seconds = duration_minutes * 60
-    BOTS_TOTAL = num_bots
+    duration_seconds = duration * 60
+    BOTS_TOTAL = users
+    headless = not visible_mode  # visible_mode=True means headless=False
     
     print(f"\n{'='*60}")
-    print(f"🚀 Starting {num_bots} bots for meeting: {meeting_id}")
-    print(f"⏱️  Duration: {duration_minutes} minutes")
-    print(f"🔒 Passcode: {passcode if passcode else 'None'}")
-    print(f"🖥️  Headless mode: {headless}")
+    print(f"🚀 Starting {users} bots for meeting: {meeting_code}")
+    print(f"⏱️  Duration: {duration} minutes")
+    print(f"🔒 Passcode: {passcode if passcode and passcode != '0' else 'None'}")
+    print(f"🖥️  Mode: {'Visible' if visible_mode else 'Background'}")
     print(f"{'='*60}\n")
     
     # Create and run bot tasks
-    async def run_bots():
+    async def run_tasks():
         tasks = []
-        for i in range(num_bots):
+        for i in range(users):
             tag = f"Bot-{i+1}"
             task = asyncio.create_task(
-                start_bot(tag, duration_seconds, meeting_id, passcode, headless)
+                start(tag, duration_seconds, meeting_code, passcode, headless)
             )
             tasks.append(task)
-            await asyncio.sleep(0.5)  # Small delay between bot starts
+            await asyncio.sleep(0.3)  # Small delay between bot starts
         
         # Wait for all bots to complete
         await asyncio.gather(*tasks)
@@ -422,16 +429,26 @@ def main(meeting_id, passcode, num_bots, duration_minutes, headless=True):
         print(f"{'='*60}\n")
     
     # Run the async function
-    asyncio.run(run_bots())
+    asyncio.run(run_tasks())
 
 
 # ============================================
-# USAGE EXAMPLE (Cell 2 mein ye call karo)
+# MAIN - FOR COMMAND LINE
 # ============================================
-# main(
-#     meeting_id="5415403058",
-#     passcode="850893",
-#     num_bots=10,
-#     duration_minutes=5,
-#     headless=True
-# )
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Zoom Bot - Auto Join with Indian Names')
+    parser.add_argument('-u', '--users', type=int, default=5, help='Number of bots')
+    parser.add_argument('-m', '--meeting', type=str, required=True, help='Meeting ID')
+    parser.add_argument('-p', '--passcode', type=str, default='', help='Passcode')
+    parser.add_argument('-t', '--time', type=int, default=90, help='Duration in minutes')
+    parser.add_argument('-v', '--visible', action='store_true', help='Show browsers (headless by default)')
+    
+    args = parser.parse_args()
+    
+    run_instances(
+        users=args.users,
+        meeting_code=args.meeting,
+        passcode=args.passcode,
+        duration=args.time,
+        visible_mode=args.visible
+    )
