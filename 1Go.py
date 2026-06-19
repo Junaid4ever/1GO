@@ -1,3 +1,7 @@
+# ============================================
+# CELL 2: ZOOM BOT FUNCTIONS
+# ============================================
+
 import threading
 import asyncio
 import sys
@@ -10,7 +14,9 @@ import nest_asyncio
 
 nest_asyncio.apply()
 
-# INDIAN NAMES USE KARO
+# ============================================
+# INDIAN NAME GENERATOR
+# ============================================
 def get_indian_name():
     """Generate random Indian name"""
     gender = random.choice(['male', 'female'])
@@ -23,7 +29,9 @@ def sync_print(msg):
         timestamp = datetime.now().strftime("%H:%M:%S")
         print(f"[{timestamp}] {msg}")
 
-# URL encode
+# ============================================
+# ZOOM URL
+# ============================================
 ZOOM_PARTS = {
     'domain': base64.b64decode('em9vbS51cw==').decode(),
     'join_path': base64.b64decode('d2Mvam9pbg==').decode()
@@ -32,7 +40,9 @@ ZOOM_PARTS = {
 def get_zoom_url(meeting_code):
     return f"https://{ZOOM_PARTS['domain']}/{ZOOM_PARTS['join_path']}/{meeting_code}"
 
-# Global variable for synchronization
+# ============================================
+# SYNC BARRIER - SAB BOTS EK SAATH JOIN KARENGE
+# ============================================
 READY_TO_JOIN = asyncio.Event()
 BOTS_READY = 0
 BOTS_TOTAL = 0
@@ -52,14 +62,16 @@ async def wait_for_all_bots():
 
     if ready + failed >= total:
         READY_TO_JOIN.set()
-        sync_print("[SYNC] All bots ready! Joining together...")
+        sync_print("⚡ All bots ready! Joining together...")
 
     await READY_TO_JOIN.wait()
 
+# ============================================
+# JOIN AUDIO BY COMPUTER
+# ============================================
 async def join_audio_computer(page, tag):
     """Click on 'Join Audio by Computer' if prompted"""
     try:
-        # Multiple selectors for audio join button
         audio_selectors = [
             'xpath=//button[contains(text(), "Join Audio")]',
             'xpath=//button[contains(text(), "Computer Audio")]',
@@ -75,12 +87,11 @@ async def join_audio_computer(page, tag):
                     await audio_btn.first.wait_for(state="visible", timeout=5000)
                     await asyncio.sleep(1)
                     await audio_btn.first.click()
-                    sync_print(f"{tag} audio joined")
+                    sync_print(f"{tag} ✅ audio joined")
                     return True
             except:
                 continue
 
-        # Check if already joined
         muted_btn = page.locator('xpath=//button[contains(@aria-label, "mute") or contains(@aria-label, "Mute")]')
         if await muted_btn.count() > 0:
             sync_print(f"{tag} already has audio")
@@ -91,9 +102,12 @@ async def join_audio_computer(page, tag):
 
     return False
 
+# ============================================
+# WAIT FOR MEETING TO START (HOST WAITING)
+# ============================================
 async def wait_for_meeting_to_start(page, tag):
     """
-    Yeh function tab tak wait karega jab tak meeting start nahi ho jaati
+    Wait until meeting starts (host joins)
     Xpath: //*[@id="root"]/div/div[2]/div[1]/div[3]/span
     """
     waiting_xpath = 'xpath=//*[@id="root"]/div/div[2]/div[1]/div[3]/span'
@@ -101,54 +115,48 @@ async def wait_for_meeting_to_start(page, tag):
     sync_print(f"{tag} checking if meeting is live...")
     
     try:
-        # Pehle check karo ki kya yeh element exist karta hai
         waiting_element = page.locator(waiting_xpath)
         
-        # Agar element exist karta hai, matlab meeting live nahi hai
         if await waiting_element.count() > 0 and await waiting_element.is_visible():
-            sync_print(f"{tag} meeting is NOT live! Waiting for host to start...")
+            sync_print(f"{tag} ⏳ meeting is NOT live! Waiting for host to start...")
             
-            # Tab tak wait karo jab tak yeh element disappear na ho jaye
-            # Ya phir koi doosra element na aa jaye jo meeting start hone ka sign ho
             while True:
                 try:
-                    # Check if waiting message still visible
                     if await waiting_element.count() == 0 or not await waiting_element.is_visible():
-                        sync_print(f"{tag} meeting has started! Proceeding...")
+                        sync_print(f"{tag} ✅ meeting has started! Proceeding...")
                         break
                     
-                    # Kuch doosre elements check karo jo meeting start hone ke baad aate hain
-                    # Jaise mute button, participants list, etc.
-                    meeting_started_indicators = [
+                    indicators = [
                         'xpath=//button[contains(@aria-label, "mute")]',
                         'xpath=//button[contains(text(), "Participants")]',
                         'xpath=//button[contains(@aria-label, "Leave")]'
                     ]
                     
-                    for indicator in meeting_started_indicators:
+                    for indicator in indicators:
                         if await page.locator(indicator).count() > 0:
-                            sync_print(f"{tag} meeting started (detected by indicator)!")
+                            sync_print(f"{tag} ✅ meeting started (detected by indicator)!")
                             return True
                     
-                    # Wait for 2 seconds before checking again
                     await asyncio.sleep(2)
                     
                 except Exception as e:
                     await asyncio.sleep(2)
                     continue
         else:
-            sync_print(f"{tag} meeting is live! No waiting required.")
+            sync_print(f"{tag} ✅ meeting is live! No waiting required.")
             
     except Exception as e:
         sync_print(f"{tag} error while checking meeting status: {e}")
     
     return True
 
+# ============================================
+# WAIT FOR WAITING ROOM
+# ============================================
 async def wait_for_waiting_room(page, tag):
     """
-    Yeh function waiting room ke liye wait karega
+    Wait for waiting room (if enabled)
     Xpath: /html/body/div[2]/div[2]/div/div/div/div[1]/div[2]/div[1]/div[3]/span
-    Jab host admit karega, tab yeh element disappear ho jayega
     """
     waiting_room_xpath = 'xpath=/html/body/div[2]/div[2]/div/div/div/div[1]/div[2]/div[1]/div[3]/span'
     
@@ -157,28 +165,24 @@ async def wait_for_waiting_room(page, tag):
     try:
         waiting_room_element = page.locator(waiting_room_xpath)
         
-        # Check if waiting room is active
         if await waiting_room_element.count() > 0 and await waiting_room_element.is_visible():
-            sync_print(f"{tag} IN WAITING ROOM! Waiting for host to admit...")
+            sync_print(f"{tag} 🚪 IN WAITING ROOM! Waiting for host to admit...")
             
-            # Tab tak wait karo jab tak waiting room se bahar na aa jaye
             while True:
                 try:
-                    # Check if still in waiting room
                     if await waiting_room_element.count() == 0 or not await waiting_room_element.is_visible():
-                        sync_print(f"{tag} admitted to meeting! Proceeding...")
+                        sync_print(f"{tag} ✅ admitted to meeting! Proceeding...")
                         break
                     
-                    # Extra indicators check for being admitted
-                    meeting_indicators = [
+                    indicators = [
                         'xpath=//button[contains(@aria-label, "mute")]',
                         'xpath=//button[contains(text(), "Participants")]',
                         'xpath=//button[contains(@aria-label, "Leave")]'
                     ]
                     
-                    for indicator in meeting_indicators:
+                    for indicator in indicators:
                         if await page.locator(indicator).count() > 0:
-                            sync_print(f"{tag} admitted to meeting (detected by indicator)!")
+                            sync_print(f"{tag} ✅ admitted to meeting (detected by indicator)!")
                             return True
                     
                     await asyncio.sleep(2)
@@ -194,7 +198,10 @@ async def wait_for_waiting_room(page, tag):
     
     return True
 
-async def start(tag, wait_time, meetingcode, passcode, headless):
+# ============================================
+# MAIN BOT FUNCTION
+# ============================================
+async def start_bot(tag, wait_time, meetingcode, passcode, headless):
     global BOTS_FAILED
     sync_print(f"{tag} started")
 
@@ -211,6 +218,7 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
                 '--disable-video-capture',
                 '--disable-gpu',
                 '--window-size=1280,720',
+                '--disable-setuid-sandbox'
             ]
         )
 
@@ -225,17 +233,37 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
         await page.wait_for_timeout(4000)
 
         # ============================================
-        # NAME INPUT - INDIAN NAME GENERATE KARO
+        # NAME INPUT - INDIAN NAME
         # ============================================
         try:
-            name_input = page.locator('xpath=//*[@id="input-for-name"]')
-            await name_input.wait_for(state="visible", timeout=30000)
-            await asyncio.sleep(1)
+            name_selectors = [
+                'xpath=//*[@id="input-for-name"]',
+                'xpath=//input[@placeholder="Enter your name"]',
+                'xpath=//input[@name="name"]'
+            ]
             
-            # Indian name generate karo
-            user_name = get_indian_name()
-            await name_input.fill(user_name)
-            sync_print(f"{tag} name filled: {user_name}")
+            name_filled = False
+            for selector in name_selectors:
+                try:
+                    name_input = page.locator(selector)
+                    if await name_input.count() > 0:
+                        await name_input.first.wait_for(state="visible", timeout=5000)
+                        await asyncio.sleep(1)
+                        user_name = get_indian_name()
+                        await name_input.first.fill(user_name)
+                        sync_print(f"{tag} ✅ Name filled: {user_name}")
+                        name_filled = True
+                        break
+                except:
+                    continue
+            
+            if not name_filled:
+                sync_print(f"{tag} ❌ name input not found")
+                async with BOTS_LOCK:
+                    BOTS_FAILED += 1
+                await browser.close()
+                return
+                
         except Exception as e:
             sync_print(f"{tag} name fill failed: {e}")
             async with BOTS_LOCK:
@@ -244,14 +272,11 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
             return
 
         # ============================================
-        # PASSCODE INPUT - SIRF TAB SKIP KARO JAB PASSCODE EMPTY HO
+        # PASSCODE INPUT
         # ============================================
-        passcode_entered = False
-        
-        if passcode is not None and passcode != "":
-            sync_print(f"{tag} attempting to enter passcode: {passcode}")
+        if passcode and passcode != "":
+            sync_print(f"{tag} entering passcode...")
             try:
-                # Try multiple selectors for passcode input
                 passcode_selectors = [
                     'xpath=//input[@type="password"]',
                     'xpath=//input[contains(@placeholder, "code")]',
@@ -260,38 +285,37 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
                     'xpath=/html/body/div[2]/div[2]/div/div[1]/div/div[2]/div[2]/div/input'
                 ]
                 
-                pass_input = None
+                pass_filled = False
                 for selector in passcode_selectors:
                     try:
                         pass_input = page.locator(selector)
                         if await pass_input.count() > 0:
                             await pass_input.first.wait_for(state="visible", timeout=5000)
-                            pass_input = pass_input.first
+                            await asyncio.sleep(1.5)
+                            await pass_input.first.fill(passcode)
+                            sync_print(f"{tag} ✅ Passcode filled")
+                            pass_filled = True
                             break
                     except:
                         continue
                 
-                if pass_input:
-                    await asyncio.sleep(1.5)
-                    await pass_input.fill(passcode)
-                    sync_print(f"{tag} passcode filled: {passcode}")
-                    passcode_entered = True
-                else:
-                    sync_print(f"{tag} no passcode field found - meeting might not require passcode")
+                if not pass_filled:
+                    sync_print(f"{tag} ⚠️ passcode field not found - meeting might not require passcode")
                     
             except Exception as e:
-                sync_print(f"{tag} passcode fill error: {e}")
+                sync_print(f"{tag} passcode error: {e}")
         else:
-            sync_print(f"{tag} no passcode provided (empty), skipping passcode field")
+            sync_print(f"{tag} no passcode provided, skipping passcode field")
 
-        # Wait for all bots to be ready
+        # ============================================
+        # WAIT FOR ALL BOTS TO BE READY
+        # ============================================
         await wait_for_all_bots()
 
         # ============================================
-        # JOIN BUTTON CLICK
+        # JOIN BUTTON
         # ============================================
         try:
-            # Try multiple join button selectors
             join_selectors = [
                 'xpath=//button[contains(text(), "Join")]',
                 'xpath=//button[contains(@class, "join")]',
@@ -308,13 +332,13 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
                         break
                 except:
                     continue
-            
+
             if join_btn:
-                await asyncio.sleep(random.uniform(0.5, 1.5))  # Small random delay
+                await asyncio.sleep(random.uniform(0.5, 1.5))
                 await join_btn.click()
-                sync_print(f"{tag} join clicked")
+                sync_print(f"{tag} ✅ join clicked")
             else:
-                sync_print(f"{tag} join button not found")
+                sync_print(f"{tag} ❌ join button not found")
                 await browser.close()
                 return
                 
@@ -324,23 +348,90 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
             return
 
         # ============================================
-        # NEW: WAIT FOR MEETING TO START (AGAR LIVE NAHI HAI TO)
+        # WAIT FOR MEETING TO START
         # ============================================
         await wait_for_meeting_to_start(page, tag)
         
         # ============================================
-        # NEW: WAIT FOR WAITING ROOM (AGAR ENABLED HAI TO)
+        # WAIT FOR WAITING ROOM
         # ============================================
         await wait_for_waiting_room(page, tag)
 
         # ============================================
-        # FINALLY: JOIN AUDIO BY COMPUTER (JAB MEETING MEIN AA JAYE)
+        # JOIN AUDIO
         # ============================================
         await join_audio_computer(page, tag)
 
+        # ============================================
         # STAY IN MEETING
-        sync_print(f"{tag} now staying for {wait_time//60} minutes")
-        await asyncio.sleep(wait_time)
+        # ============================================
+        sync_print(f"{tag} ⏱️ staying for {wait_time//60} minutes")
+        
+        elapsed = 0
+        while elapsed < wait_time:
+            await asyncio.sleep(2)
+            elapsed += 2
 
-        sync_print(f"{tag} ended")
+        sync_print(f"{tag} ✅ ended")
         await browser.close()
+
+
+# ============================================
+# MAIN FUNCTION - CELL 2 SE CALL HOGA
+# ============================================
+def main(meeting_id, passcode, num_bots, duration_minutes, headless=True):
+    """
+    Main function to launch Zoom bots
+    
+    Parameters:
+    - meeting_id: Zoom meeting ID (e.g., "5415403058")
+    - passcode: Zoom meeting passcode (e.g., "850893")
+    - num_bots: Number of bots to launch (e.g., 10)
+    - duration_minutes: Duration in minutes (e.g., 5)
+    - headless: True=background, False=show browsers
+    """
+    
+    global BOTS_TOTAL
+    
+    duration_seconds = duration_minutes * 60
+    BOTS_TOTAL = num_bots
+    
+    print(f"\n{'='*60}")
+    print(f"🚀 Starting {num_bots} bots for meeting: {meeting_id}")
+    print(f"⏱️  Duration: {duration_minutes} minutes")
+    print(f"🔒 Passcode: {passcode if passcode else 'None'}")
+    print(f"🖥️  Headless mode: {headless}")
+    print(f"{'='*60}\n")
+    
+    # Create and run bot tasks
+    async def run_bots():
+        tasks = []
+        for i in range(num_bots):
+            tag = f"Bot-{i+1}"
+            task = asyncio.create_task(
+                start_bot(tag, duration_seconds, meeting_id, passcode, headless)
+            )
+            tasks.append(task)
+            await asyncio.sleep(0.5)  # Small delay between bot starts
+        
+        # Wait for all bots to complete
+        await asyncio.gather(*tasks)
+        
+        print(f"\n{'='*60}")
+        print("✅ All bots have completed their sessions")
+        print(f"{'='*60}\n")
+    
+    # Run the async function
+    asyncio.run(run_bots())
+
+
+# ============================================
+# USAGE EXAMPLE (Cell 2 mein ye call karo)
+# ============================================
+# main(
+#     meeting_id="5415403058",
+#     passcode="850893",
+#     num_bots=10,
+#     duration_minutes=5,
+#     headless=True
+# )
