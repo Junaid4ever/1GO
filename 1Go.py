@@ -1,5 +1,5 @@
 # ============================================
-# CELL 1: ZOOM BOT FUNCTIONS
+# CELL 1: ZOOM BOT COMPLETE CODE
 # ============================================
 
 import threading
@@ -8,6 +8,8 @@ import sys
 import base64
 import random
 import argparse
+import os
+import time
 from datetime import datetime
 from playwright.async_api import async_playwright
 import nest_asyncio
@@ -15,7 +17,7 @@ import nest_asyncio
 nest_asyncio.apply()
 
 # ============================================
-# INDIAN NAME GENERATOR (Without external lib)
+# INDIAN NAME GENERATOR
 # ============================================
 INDIAN_FIRST_NAMES = [
     'Aarav', 'Vivaan', 'Aditya', 'Vihaan', 'Arjun', 'Reyansh', 'Ayaan', 'Krishna', 'Ishaan', 'Shaurya',
@@ -55,7 +57,7 @@ def get_zoom_url(meeting_code):
     return f"https://{ZOOM_PARTS['domain']}/{ZOOM_PARTS['join_path']}/{meeting_code}"
 
 # ============================================
-# SYNC BARRIER - SAB BOTS EK SAATH JOIN KARENGE
+# SYNC BARRIER
 # ============================================
 READY_TO_JOIN = asyncio.Event()
 BOTS_READY = 0
@@ -117,13 +119,10 @@ async def join_audio_computer(page, tag):
     return False
 
 # ============================================
-# WAIT FOR MEETING TO START (HOST WAITING)
+# WAIT FOR MEETING TO START
 # ============================================
 async def wait_for_meeting_to_start(page, tag):
-    """
-    Wait until meeting starts (host joins)
-    Xpath: //*[@id="root"]/div/div[2]/div[1]/div[3]/span
-    """
+    """Wait until meeting starts (host joins)"""
     waiting_xpath = 'xpath=//*[@id="root"]/div/div[2]/div[1]/div[3]/span'
     
     sync_print(f"{tag} checking if meeting is live...")
@@ -168,10 +167,7 @@ async def wait_for_meeting_to_start(page, tag):
 # WAIT FOR WAITING ROOM
 # ============================================
 async def wait_for_waiting_room(page, tag):
-    """
-    Wait for waiting room (if enabled)
-    Xpath: /html/body/div[2]/div[2]/div/div/div/div[1]/div[2]/div[1]/div[3]/span
-    """
+    """Wait for waiting room (if enabled)"""
     waiting_room_xpath = 'xpath=/html/body/div[2]/div[2]/div/div/div/div[1]/div[2]/div[1]/div[3]/span'
     
     sync_print(f"{tag} checking for waiting room...")
@@ -213,7 +209,7 @@ async def wait_for_waiting_room(page, tag):
     return True
 
 # ============================================
-# START BOT - MAIN FUNCTION
+# START - MAIN BOT FUNCTION (FIXED)
 # ============================================
 async def start(tag, wait_time, meetingcode, passcode, headless):
     """Start a single Zoom bot"""
@@ -244,6 +240,8 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
 
         page = await context.new_page()
         zoom_url = get_zoom_url(meetingcode)
+        
+        sync_print(f"{tag} navigating to Zoom...")
         await page.goto(zoom_url, timeout=120000)
         await page.wait_for_timeout(4000)
 
@@ -315,7 +313,7 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
                         continue
                 
                 if not pass_filled:
-                    sync_print(f"{tag} ⚠️ passcode field not found - meeting might not require passcode")
+                    sync_print(f"{tag} ⚠️ passcode field not found")
                     
             except Exception as e:
                 sync_print(f"{tag} passcode error: {e}")
@@ -392,7 +390,7 @@ async def start(tag, wait_time, meetingcode, passcode, headless):
 
 
 # ============================================
-# RUN INSTANCES - MAIN FUNCTION
+# RUN_INSTANCES - MAIN ENTRY POINT (FIXED)
 # ============================================
 def run_instances(users, meeting_code, passcode, duration, visible_mode):
     """Main function to launch multiple Zoom bots"""
@@ -433,13 +431,13 @@ def run_instances(users, meeting_code, passcode, duration, visible_mode):
 
 
 # ============================================
-# MAIN - FOR COMMAND LINE
+# MAIN - COMMAND LINE SUPPORT
 # ============================================
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Zoom Bot - Auto Join with Indian Names')
+    parser = argparse.ArgumentParser(description='Zoom Bot - Auto Join')
     parser.add_argument('-u', '--users', type=int, default=5, help='Number of bots')
     parser.add_argument('-m', '--meeting', type=str, required=True, help='Meeting ID')
-    parser.add_argument('-p', '--passcode', type=str, default='', help='Passcode')
+    parser.add_argument('-p', '--passcode', type=str, default='', help='Passcode (use "0" for none)')
     parser.add_argument('-t', '--time', type=int, default=90, help='Duration in minutes')
     parser.add_argument('-v', '--visible', action='store_true', help='Show browsers (headless by default)')
     
